@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Palladium</title>
+  <style>
+    body { max-width: 640px; margin: auto; padding: 10px; font: 14px 'Comic Sans MS', 'Comic Sans', cursive; }
+    button, input { font: inherit; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .cell { height: 74px; background: #e4e4e7; border-radius: 6px; }
+    .red { background: #ff0000; }
+    .green { background: #00ff00; }
+    .boss { width: 50%; margin: 4px auto; padding: 6px; text-align: center; border: 2px solid #a1a1aa; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div id="lobby">
+    <input id="name" placeholder="username"> <button onclick="start()">Create room</button><br>
+    <input id="code" placeholder="Room code" maxlength="4"> <button onclick="start(true)">Join room</button>
+  </div>
+
+  <div id="game" hidden>
+    <b id="room"></b>
+    <div class="boss" id="opp"></div>
+    <div class="grid" id="board"></div>
+    <div class="boss">Your Boss HP 15</div>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const me = localStorage.pid ||= 'p' + Math.random().toString(36).slice(2);
+    let room;
+
+    // GET the room, or POST new room data
+    const api = body => fetch('/api/room/' + room, body && { method: 'POST', body: JSON.stringify(body) });
+
+    async function start(joining) {
+      const player = { id: me, name: $('name').value };
+      let state = { players: [player] };
+      room = joining ? $('code').value.toUpperCase() : Math.random().toString(36).slice(2, 6).toUpperCase();
+
+      if (joining) {
+        const res = await api();
+        if (!res.ok) return alert('Room not found');
+        state = await res.json();
+        if (!state.players.some(p => p.id == me)) {
+          if (state.players.length > 1) return alert('Room is full');
+          state.players.push(player);
+        }
+      }
+      await api(state);
+
+      $('lobby').hidden = true;
+      $('game').hidden = false;
+      $('room').textContent = 'Room ' + room;
+      $('board').innerHTML = [...Array(16)].map((_, i) => `<div class="cell ${i < 4 ? 'red' : i > 11 ? 'green' : ''}"></div>`).join('');
+
+      // check every 2 seconds for an opponent
+      setInterval(async () => {
+        const { players } = await (await api()).json();
+        $('opp').textContent = players.length > 1 ? 'Boss HP 15' : '';
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
